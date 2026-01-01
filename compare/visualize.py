@@ -12,7 +12,7 @@ font = {"size": 24}
 plt.rc("font", **font)
 
 plt.plot(xrange, cpu)
-plt.xlim(1, 1024)
-plt.ylim(0, 0.002)
+plt.xlim(1, 2048)
+plt.ylim(0, 0.01)
 plt.plot(xrange, gpu)
 plt.show()

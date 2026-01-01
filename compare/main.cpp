@@ -17,13 +17,28 @@ void matmul_openblas(float *A, float *B, float *C, int n) {
 }
 
 void matmul_cublas(float *A, float *B, float *C, int n) {
+  float *A_gpu;
+  float *B_gpu;
+  float *C_gpu;
+
+  cudaMalloc(&A_gpu, n * n * sizeof(float));
+  cudaMalloc(&B_gpu, n * n * sizeof(float));
+  cudaMalloc(&C_gpu, n * n * sizeof(float));
+
+  cudaMemcpy(A_gpu, A, n * n * sizeof(float), cudaMemcpyHostToDevice);
+  cudaMemcpy(B_gpu, B, n * n * sizeof(float), cudaMemcpyHostToDevice);
+
   cublasHandle_t handle;
   cublasCreate(&handle);
 
-  cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, n, n, n, (float[]){1.0f}, B, n,
-              A, n, (float[]){1.0f}, C, n);
+  cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, n, n, n, (float[]){1.0f}, B_gpu,
+              n, A_gpu, n, (float[]){1.0f}, C_gpu, n);
 
   cublasDestroy(handle);
+
+  cudaFree(A_gpu);
+  cudaFree(B_gpu);
+  cudaFree(C_gpu);
 }
 
 void init_matrix(float *mat, int n) {
@@ -59,46 +74,29 @@ double measure_time(Func matmul_func, float *A, float *B, float *C, int n,
 
 int main() {
   const int start_size = 2;
-  const int end_size = 1024;
+  const int end_size = 2048;
   const int step_size = 2;
   const int num_runs = 100;
 
   cudaSetDevice(0);
 
   for (int n = start_size; n <= end_size; n += step_size) {
-    float *A_cpu = new float[n * n];
-    float *B_cpu = new float[n * n];
-    float *C_cpu = new float[n * n];
+    float *A = new float[n * n];
+    float *B = new float[n * n];
+    float *C = new float[n * n];
 
-    float *A_gpu;
-    float *B_gpu;
-    float *C_gpu;
+    init_matrix(A, n);
+    init_matrix(B, n);
 
-    cudaMalloc(&A_gpu, n * n * sizeof(float));
-    cudaMalloc(&B_gpu, n * n * sizeof(float));
-    cudaMalloc(&C_gpu, n * n * sizeof(float));
-
-    init_matrix(A_cpu, n);
-    init_matrix(B_cpu, n);
-
-    cudaMemcpy(A_gpu, A_cpu, n * n * sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpy(B_gpu, B_cpu, n * n * sizeof(float), cudaMemcpyHostToDevice);
-
-    double cpu_time =
-        measure_time(matmul_openblas, A_cpu, B_cpu, C_cpu, n, num_runs);
+    double cpu_time = measure_time(matmul_openblas, A, B, C, n, num_runs);
     std::cout << cpu_time << "\n";
 
-    double gpu_time =
-        measure_time(matmul_cublas, A_gpu, B_gpu, C_gpu, n, num_runs);
+    double gpu_time = measure_time(matmul_cublas, A, B, C, n, num_runs);
     std::cout << gpu_time << "\n";
 
-    delete[] A_cpu;
-    delete[] B_cpu;
-    delete[] C_cpu;
-
-    cudaFree(A_gpu);
-    cudaFree(B_gpu);
-    cudaFree(C_gpu);
+    delete[] A;
+    delete[] B;
+    delete[] C;
   }
 
   return 0;
